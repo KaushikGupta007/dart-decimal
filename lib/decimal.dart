@@ -117,14 +117,14 @@ class Decimal implements Comparable<Decimal> {
 
   @override
   int compareTo(Decimal other) {
-    var (d1, d2) = _unifyScale(this, other);
-    return d1._value.compareTo(d2._value);
+    final unified = _unifyScale(this, other);
+    return unified.first._value.compareTo(unified.second._value);
   }
 
   /// Addition operator.
   Decimal operator +(Decimal other) {
-    var (d1, d2) = _unifyScale(this, other);
-    return Decimal._(d1._value + d2._value, d1._scale);
+    final unified = _unifyScale(this, other);
+    return Decimal._(unified.first._value + unified.second._value, unified.first._scale);
   }
 
   /// Subtraction operator.
@@ -138,8 +138,8 @@ class Decimal implements Comparable<Decimal> {
   ///
   /// See [num.operator%].
   Decimal operator %(Decimal other) {
-    var (d1, d2) = _unifyScale(this, other);
-    return Decimal._(d1._value % d2._value, d1._scale);
+    final unified = _unifyScale(this, other);
+    return Decimal._(unified.first._value % unified.second._value, unified.first._scale);
   }
 
   /// Division operator.
@@ -149,8 +149,8 @@ class Decimal implements Comparable<Decimal> {
   ///
   /// See [num.operator~/].
   BigInt operator ~/(Decimal other) {
-    var (d1, d2) = _unifyScale(this, other);
-    return d1._value ~/ d2._value;
+    final unified = _unifyScale(this, other);
+    return unified.first._value ~/ unified.second._value;
   }
 
   /// Returns the negative value of this rational.
@@ -158,8 +158,8 @@ class Decimal implements Comparable<Decimal> {
 
   /// Return the remainder from dividing this [Decimal] by [other].
   Decimal remainder(Decimal other) {
-    var (d1, d2) = _unifyScale(this, other);
-    return Decimal._(d1._value.remainder(d2._value), d1._scale);
+    final unified = _unifyScale(this, other);
+    return Decimal._(unified.first._value.remainder(unified.second._value), unified.first._scale);
   }
 
   /// Whether this number is numerically smaller than [other].
@@ -257,22 +257,30 @@ class Decimal implements Comparable<Decimal> {
           : this;
 
   /// The [BigInt] obtained by discarding any fractional digits from `this`.
-  BigInt toBigInt() => switch (this) {
-        var d when d._scale > 0 => d._value ~/ _i10.pow(d._scale),
-        var d when d._scale < 0 => d._value * _i10.pow(-d._scale),
-        var d => d._value,
-      };
+  BigInt toBigInt() {
+    if (_scale > 0) {
+      return _value ~/ _i10.pow(_scale);
+    } else if (_scale < 0) {
+      return _value * _i10.pow(-_scale);
+    } else {
+      return _value;
+    }
+  }
 
   /// Returns `this` as a [double].
   ///
   /// If the number is not representable as a [double], an approximation is
   /// returned. For numerically large integers, the approximation may be
   /// infinite.
-  double toDouble() => switch (this) {
-        var d when d._scale > 0 => d._value / _i10.pow(d._scale),
-        var d when d._scale < 0 => (d._value * _i10.pow(-d._scale)).toDouble(),
-        var d => d._value.toDouble(),
-      };
+  double toDouble() {
+    if (_scale > 0) {
+      return _value / _i10.pow(_scale);
+    } else if (_scale < 0) {
+      return (_value * _i10.pow(-_scale)).toDouble();
+    } else {
+      return _value.toDouble();
+    }
+  }
 
   /// The precision of this [Decimal].
   ///
@@ -378,14 +386,17 @@ class Decimal implements Comparable<Decimal> {
   /// Returns [Rational.one] if the [exponent] equals `0`.
   Rational pow(int exponent) => _rational.pow(exponent);
 
-  static (Decimal, Decimal) _unifyScale(Decimal d1, Decimal d2) {
-    var s1 = d1._scale;
-    var s2 = d2._scale;
-    return switch (null) {
-      _ when s1 > s2 => (d1, Decimal._(d2._value * _i10.pow(s1 - s2), s1)),
-      _ when s1 < s2 => (Decimal._(d1._value * _i10.pow(s2 - s1), s2), d2),
-      _ => (d1, d2),
-    };
+  static DecimalPair _unifyScale(Decimal d1, Decimal d2) {
+    final s1 = d1._scale;
+    final s2 = d2._scale;
+
+    if (s1 > s2) {
+      return DecimalPair(d1, Decimal._(d2._value * _i10.pow(s1 - s2), s1));
+    } else if (s1 < s2) {
+      return DecimalPair(Decimal._(d1._value * _i10.pow(s2 - s1), s2), d2);
+    } else {
+      return DecimalPair(d1, d2);
+    }
   }
 
   late final Decimal _rescaled = () {
@@ -475,4 +486,11 @@ extension BigIntExt on BigInt {
 extension IntExt on int {
   /// This [int] as a [Decimal].
   Decimal toDecimal() => Decimal.fromInt(this);
+}
+
+class DecimalPair {
+  final Decimal first;
+  final Decimal second;
+
+  DecimalPair(this.first, this.second);
 }
